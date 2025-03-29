@@ -1,0 +1,3 @@
+./diagnostics_logs/*
+.env
+network_log.csv
