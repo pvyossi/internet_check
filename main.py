@@ -67,11 +67,24 @@ def network_diagnostics_async(timestamp, reason, ping_output):
 
 def summarize_tracert(tracert_output):
     lines = tracert_output.split('; ')
-    for line in lines:
-        if '*' in line or '要求がタイムアウトしました' in line:
-            hop = line.strip().split(' ')[0]
-            return f"{hop}以降に到達不能"
-    return "最終ホップまで到達可能"
+    last_reachable = None
+
+    for i, line in enumerate(lines):
+        if line.strip() == '':
+            continue
+        if '*' in line:
+            if last_reachable is not None:
+                return f"{last_reachable}ホップ目以降に到達不能"
+            return f"最初のホップから応答なし"
+        else:
+            last_reachable = i + 1
+
+    # 最終行にもIPがあるか確認（最終ホップが応答してるか）
+    if last_reachable == len(lines):
+        return "最終ホップまで到達可能"
+    else:
+        return f"{last_reachable}ホップ目以降に到達不能"
+
 
 def summarize_nslookup(nslookup_output):
     if 'Addresses:' in nslookup_output or 'Address:' in nslookup_output:
