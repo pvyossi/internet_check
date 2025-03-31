@@ -14,9 +14,14 @@ PING_ADDRESS = os.getenv('PING_ADDRESS', '8.8.8.8')
 DOMAIN_NAME = os.getenv('DOMAIN_NAME', 'dns.google')
 PING_INTERVAL = int(os.getenv('PING_INTERVAL', '1'))
 IGNORE_TIMEOUT_SEC = int(os.getenv('IGNORE_TIMEOUT_SEC', '5'))
-LOG_FILE = os.getenv('LOG_FILE', 'network_log.csv')
-DIAGNOSTICS_LOG_DIR = os.getenv('DIAGNOSTICS_LOG_DIR', 'diagnostics_logs')
-os.makedirs(DIAGNOSTICS_LOG_DIR, exist_ok=True)
+
+# ログ関係
+LOGS_DIR = os.getenv('LOGS_DIR', 'logs')
+DIAGNOSTICS_SUBDIR = os.getenv('DIAGNOSTICS_SUBDIR', 'diagnostics')
+os.makedirs(LOGS_DIR, exist_ok=True)  # logsディレクトリを作成
+
+# CSVログファイルを logs配下に作成
+LOG_FILE = os.path.join(LOGS_DIR, os.getenv('LOG_FILE', 'network_log.csv'))
 
 # === ping関数 ===
 def ping():
@@ -33,7 +38,7 @@ def ping():
 # === 診断実行関数（同期） ===
 def network_diagnostics():
     commands = {
-        'tracert': ['tracert', PING_ADDRESS],  # ← IPで実行！
+        'tracert': ['tracert', PING_ADDRESS],  # IPで実行
         'ipconfig': ['ipconfig', '/all'],
         'nslookup': ['nslookup', DOMAIN_NAME]
     }
@@ -56,7 +61,9 @@ def network_diagnostics_async(timestamp, reason, ping_output,
     def diagnostics():
         dt = datetime.datetime.strptime(timestamp, '%Y/%m/%d %H:%M:%S')
         folder_name = dt.strftime('%Y%m%d_%H%M%S')
-        folder_path = os.path.join(DIAGNOSTICS_LOG_DIR, folder_name)
+
+        # logs / diagnostics / 20230101_120000 などのディレクトリ構造になる
+        folder_path = os.path.join(LOGS_DIR, DIAGNOSTICS_SUBDIR, folder_name)
         os.makedirs(folder_path, exist_ok=True)
 
         with open(os.path.join(folder_path, "ping.txt"), 'w', encoding='utf-8') as f:
@@ -68,6 +75,7 @@ def network_diagnostics_async(timestamp, reason, ping_output,
         with open(os.path.join(folder_path, "nslookup.txt"), 'w', encoding='utf-8') as f:
             f.write(nslookup_result)
 
+    # 非同期で診断ログを作成
     threading.Thread(target=diagnostics, daemon=True).start()
 
 # === 各診断要約 ===
@@ -129,7 +137,7 @@ def summarize_nslookup(nslookup_output):
     if ip_match:
         ip = ip_match.group(1)
         if ip.startswith(('192.', '10.', '127.', '169.254.')):
-            return f"DNS解決失敗（ローカルIP応答: {ip}）"
+            return f"DNS解決失敗（ローカルIP応答: {ip})"
         return f"DNS解決成功 ({DOMAIN_NAME} -> {ip})"
 
     return "DNS解決失敗（応答なし）"
@@ -145,6 +153,7 @@ def main():
     failure_reason = ""
     failure_logged = False
 
+    # CSVファイルが存在しない場合、ヘッダー行を作成
     if not os.path.exists(LOG_FILE):
         with open(LOG_FILE, 'w', newline='', encoding='utf-8') as f:
             csv.writer(f).writerow(['日時', '状態', '理由', '継続秒数'])

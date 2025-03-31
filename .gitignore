@@ -1,3 +1,2 @@
-diagnostics_logs/
+logs/
 .env
-network_log.csv
