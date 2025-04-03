@@ -1,1 +1,1 @@
-Windows用
+Windows/Ubuntu用
