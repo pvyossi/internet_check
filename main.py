@@ -38,7 +38,7 @@ def ping():
                 ['ping', '-c', '1', '-W', '1', PING_ADDRESS],
                 stderr=subprocess.STDOUT,
                 encoding='utf-8'
-            )
+            ).strip()
         return ("ttl=" in output.lower()) or ("TTL=" in output), output.strip()
     except subprocess.CalledProcessError as e:
         return False, e.output.strip()
@@ -52,10 +52,30 @@ def network_diagnostics():
             'nslookup': ['nslookup', DOMAIN_NAME]
         }
     else:
+        tracert_cmd = ['traceroute', PING_ADDRESS]
+        try:
+            subprocess.check_output(['which', 'traceroute'], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError:
+            try:
+                subprocess.check_output(['which', 'tracepath'], stderr=subprocess.STDOUT)
+                tracert_cmd = ['tracepath', PING_ADDRESS]
+            except subprocess.CalledProcessError:
+                tracert_cmd = ['echo', 'traceroute/tracepathコマンドが見つかりません']
+        
+        nslookup_cmd = ['nslookup', DOMAIN_NAME]
+        try:
+            subprocess.check_output(['which', 'nslookup'], stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError:
+            try:
+                subprocess.check_output(['which', 'host'], stderr=subprocess.STDOUT)
+                nslookup_cmd = ['host', DOMAIN_NAME]
+            except subprocess.CalledProcessError:
+                nslookup_cmd = ['echo', 'nslookup/hostコマンドが見つかりません']
+        
         commands = {
-            'tracert': ['traceroute', PING_ADDRESS],
+            'tracert': tracert_cmd,
             'ipconfig': ['ip', 'a'],
-            'nslookup': ['nslookup', DOMAIN_NAME]
+            'nslookup': nslookup_cmd
         }
     results = {}
     for key, cmd in commands.items():
@@ -171,10 +191,10 @@ def main():
                 failure_reason = "タイムアウト" if "timeout" in output.lower() else "接続エラー"
                 failure_logged = False
 
-            duration = (now - failure_start).total_seconds()
+            duration = (now - failure_start).total_seconds() if failure_start else 0
             if not failure_logged and duration > IGNORE_TIMEOUT_SEC:
-                failure_time_str = failure_start.strftime('%Y/%m/%d %H:%M:%S')
-                print(f"{failure_time_str} 接続失敗: {failure_reason}")
+                failure_time_str = failure_start.strftime('%Y/%m/%d %H:%M:%S') if failure_start else now.strftime('%Y/%m/%d %H:%M:%S')
+                print(f"[接続失敗] {failure_time_str}: {failure_reason}")
 
                 with open(LOG_FILE, 'a', newline='', encoding='utf-8') as f:
                     csv.writer(f).writerow([failure_time_str, "接続失敗", failure_reason, "-"])
@@ -201,13 +221,13 @@ def main():
         else:
             if disconnected:
                 disconnected = False
-                duration = int((now - failure_start).total_seconds())
+                duration = int((now - failure_start).total_seconds()) if failure_start else 0
                 if failure_logged:
                     now_str = now.strftime('%Y/%m/%d %H:%M:%S')
                     with open(LOG_FILE, 'a', newline='', encoding='utf-8') as f:
                         csv.writer(f).writerow([now_str, "接続復旧", failure_reason, duration])
-                    print(f"{now_str} 接続復旧")
-                    print(f"{failure_start.strftime('%Y/%m/%d %H:%M:%S')} ～ {now_str} 接続失敗 | 継続秒数: {duration}秒")
+                    print(f"[接続復旧] {now_str}")
+                    print(f"接続失敗期間: {failure_start.strftime('%Y/%m/%d %H:%M:%S') if failure_start else '不明'} ～ {now_str} (継続秒数: {duration}秒)")
 
         time.sleep(PING_INTERVAL)
 
