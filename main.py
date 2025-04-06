@@ -82,12 +82,14 @@ def network_diagnostics():
         try:
             output = subprocess.check_output(
                 cmd, stderr=subprocess.STDOUT,
-                encoding='utf-8', timeout=60
+                encoding='shift_jis' if IS_WINDOWS else 'utf-8', timeout=60
             ).strip()
         except subprocess.CalledProcessError as e:
-            output = e.output.strip()
+            output = e.output.strip() if hasattr(e, 'output') and e.output is not None else f"{key}コマンドの実行エラー"
         except subprocess.TimeoutExpired:
             output = f"{key}コマンドがタイムアウトしました。"
+        except UnicodeDecodeError:
+            output = f"{key}コマンドの出力エンコーディングエラー"
         results[key] = output
     return results['tracert'], results['ipconfig'], results['nslookup']
 
