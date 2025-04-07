@@ -228,9 +228,6 @@ def main():
 ・nslookup: {summarize_nslookup(nslookup_result)}
 ・ipconfig: {summarize_ipconfig(ipconfig_result)}
 """
-                
-                notification_message = f"[接続失敗] {failure_time_str}: {failure_reason}\n{diagnosis_summary}"
-                send_slack_notification(notification_message, is_failure=True)
 
                 network_diagnostics_async(
                     failure_time_str,
