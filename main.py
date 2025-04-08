@@ -5,6 +5,7 @@ import os
 import csv
 import threading
 import re
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,6 +21,7 @@ LOGS_DIR = os.getenv('LOGS_DIR', 'logs')
 DIAGNOSTICS_SUBDIR = os.getenv('DIAGNOSTICS_SUBDIR', 'diagnostics')
 os.makedirs(LOGS_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOGS_DIR, os.getenv('LOG_FILE', 'network_log.csv'))
+SLACK_WEBHOOK_URL = os.getenv('SLACK_WEBHOOK_URL', '')
 
 # OS判定（Windowsかどうか）
 IS_WINDOWS = os.name == 'nt'
@@ -111,6 +113,17 @@ def network_diagnostics_async(timestamp, reason, ping_output,
         with open(os.path.join(folder_path, "nslookup.txt"), 'w', encoding='utf-8') as f:
             f.write(nslookup_result)
     threading.Thread(target=diagnostics, daemon=True).start()
+
+def send_slack_notification(message, is_failure=True):
+    if not IS_WINDOWS and SLACK_WEBHOOK_URL:
+        try:
+            payload = {"text": message}
+            emoji = "❌" if is_failure else "✅"
+            payload["text"] = f"{emoji} {payload['text']}"
+            response = requests.post(SLACK_WEBHOOK_URL, json=payload)
+            response.raise_for_status()
+        except Exception as e:
+            print(f"Slack通知エラー: {str(e)}")
 
 # === 各診断要約 ===
 def summarize_ping(ping_output):
@@ -208,6 +221,13 @@ def main():
                 print(f"・traceroute : {summarize_tracert(tracert_result)}")
                 print(f"・nslookup: {summarize_nslookup(nslookup_result)}")
                 print(f"・ipconfig: {summarize_ipconfig(ipconfig_result)}")
+                
+                diagnosis_summary = f"""
+・ping    : {summarize_ping(output)}
+・traceroute : {summarize_tracert(tracert_result)}
+・nslookup: {summarize_nslookup(nslookup_result)}
+・ipconfig: {summarize_ipconfig(ipconfig_result)}
+"""
 
                 network_diagnostics_async(
                     failure_time_str,
@@ -230,6 +250,9 @@ def main():
                         csv.writer(f).writerow([now_str, "接続復旧", failure_reason, duration])
                     print(f"[接続復旧] {now_str}")
                     print(f"接続失敗期間: {failure_start.strftime('%Y/%m/%d %H:%M:%S') if failure_start else '不明'} ～ {now_str} (継続秒数: {duration}秒)")
+                    
+                    recovery_message = f"[接続復旧] {now_str}\n接続失敗期間: {failure_start.strftime('%Y/%m/%d %H:%M:%S') if failure_start else '不明'} ～ {now_str} (継続秒数: {duration}秒)"
+                    send_slack_notification(recovery_message, is_failure=False)
 
         time.sleep(PING_INTERVAL)
 
