@@ -22,6 +22,7 @@ DIAGNOSTICS_SUBDIR = os.getenv('DIAGNOSTICS_SUBDIR', 'diagnostics')
 os.makedirs(LOGS_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOGS_DIR, os.getenv('LOG_FILE', 'network_log.csv'))
 SLACK_WEBHOOK_URL = os.getenv('SLACK_WEBHOOK_URL', '')
+CLOUD_WATCH_LOG_URL = os.getenv('CLOUD_WATCH_LOG_URL', '')
 
 # OS判定（Windowsかどうか）
 IS_WINDOWS = os.name == 'nt'
@@ -124,6 +125,12 @@ def send_slack_notification(message, is_failure=True):
             response.raise_for_status()
         except Exception as e:
             print(f"Slack通知エラー: {str(e)}")
+
+def send_cloudwatch_log(message):
+    try:
+        requests.post(CLOUD_WATCH_LOG_URL, json={"message": message})
+    except Exception as e:
+        print(f"CloudWatchログ送信エラー: {str(e)}")
 
 # === 各診断要約 ===
 def summarize_ping(ping_output):
