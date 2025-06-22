@@ -260,6 +260,7 @@ def main():
                     
                     recovery_message = f"[接続復旧] {now_str}\n接続失敗期間: {failure_start.strftime('%Y/%m/%d %H:%M:%S') if failure_start else '不明'} ～ {now_str} (継続秒数: {duration}秒)"
                     send_slack_notification(recovery_message, is_failure=False)
+                    send_cloudwatch_log(recovery_messag)
 
         time.sleep(PING_INTERVAL)
 
